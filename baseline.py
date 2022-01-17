@@ -11,6 +11,8 @@ import sklearn
 import sklearn.linear_model
 import sklearn.metrics
 import sklearn.model_selection
+from sklearn.preprocessing import FunctionTransformer
+from sklearn.pipeline import make_pipeline
 
 
 parser = argparse.ArgumentParser()
@@ -20,17 +22,18 @@ parser.add_argument("--num_runs", required=True, type=int,
                     help="Number of runs for the cross validation")
 parser.add_argument("--num_splits", default=5, type=int,
                     help="Number of splits for the cross validation")
+parser.add_argument("--estimator", default='baseline', type=str,
+                    help="Classification pipeline to use")
 
 
-
-def get_average_features(filenames):
-    """Load and aggregate the resnet features by the average.
+def get_features(filenames):
+    """Load the resnet features.
 
     Args:
         filenames: list of filenames of length `num_patients` corresponding to resnet features
 
     Returns:
-        features: np.array of mean resnet features, shape `(num_patients, 2048)`
+        features: np.array of resnet features, shape `(num_patients, 2048)`
     """
     # Load numpy arrays
     features = []
@@ -40,11 +43,17 @@ def get_average_features(filenames):
         # Remove location features (but we could use them?)
         patient_features = patient_features[:, 3:]
 
-        aggregated_features = np.mean(patient_features, axis=0)
-        features.append(aggregated_features)
+        features.append(patient_features)
 
     features = np.stack(features, axis=0)
     return features
+
+
+mean_transformer = FunctionTransformer(lambda x: np.mean(x, axis=0))
+log_reg = sklearn.linear_model.LogisticRegression(penalty="l2", C=1.0, solver="liblinear")
+baseline = make_pipeline(mean_transformer, log_reg)
+
+ESTIMATORS = {'baseline': baseline}
 
 
 if __name__ == "__main__":
@@ -55,7 +64,7 @@ if __name__ == "__main__":
     assert args.data_dir.is_dir()
 
     train_dir = args.data_dir / "train_input" / "resnet_features"
-    test_dir = args.data_dir / "test_input"  / "resnet_features"
+    test_dir = args.data_dir / "test_input" / "resnet_features"
 
     train_output_filename = args.data_dir / "train_output.csv"
 
@@ -71,17 +80,19 @@ if __name__ == "__main__":
 
     assert len(filenames_train) == len(labels_train)
 
-
     # Get the numpy filenames for test
     filenames_test = sorted(test_dir.glob("*.npy"))
     for filename in filenames_test:
         assert filename.is_file(), filename
     ids_test = [f.stem for f in filenames_test]
 
-
     # Get the resnet features and aggregate them by the average
-    features_train = get_average_features(filenames_train)
-    features_test = get_average_features(filenames_test)
+    features_train = get_features(filenames_train)
+    features_test = get_features(filenames_test)
+
+    # Define the estimator
+    assert args.estimator in ESTIMATORS
+    base_estimator = ESTIMATORS[args.estimator]
 
     # -------------------------------------------------------------------------
     # Use the average resnet features to predict the labels
@@ -90,8 +101,7 @@ if __name__ == "__main__":
     aucs = []
     for seed in range(args.num_runs):
         # Use logistic regression with L2 penalty
-        estimator = sklearn.linear_model.LogisticRegression(penalty="l2", C=1.0, solver="liblinear")
-
+        estimator = sklearn.base.clone(base_estimator)
         cv = sklearn.model_selection.StratifiedKFold(n_splits=args.num_splits, shuffle=True,
                                                      random_state=seed)
 
@@ -103,15 +113,14 @@ if __name__ == "__main__":
 
     aucs = np.array(aucs)
 
-    print("Predicting weak labels by mean resnet")
+    print(f"Predicting weak labels with model {args.estimator}")
     print("AUC: mean {}, std {}".format(aucs.mean(), aucs.std()))
-
 
     # -------------------------------------------------------------------------
     # Prediction on the test set
 
     # Train a final model on the full training set
-    estimator = sklearn.linear_model.LogisticRegression(penalty="l2", C=1.0, solver="liblinear")
+    estimator = sklearn.base.clone(base_estimator)
     estimator.fit(features_train, labels_train)
 
     preds_test = estimator.predict_proba(features_test)[:, 1]
