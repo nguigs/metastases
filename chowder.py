@@ -17,7 +17,10 @@ class CHOWDER(nn.Module):
 
     def forward(self, x):
         embedded = torch.matmul(x, self.feature_embedding)
-        min, _ = torch.topk(embedded, self.retain, largest=False)
-        max, _ = torch.topk(embedded, self.retain)
-        max_min = torch.cat([min, max], dim=-1)
+        min_feature, _ = torch.topk(embedded, self.retain, largest=False)
+        max_feature, _ = torch.topk(embedded, self.retain)
+        max_min = torch.cat([min_feature, max_feature], dim=-1)
         return self.fully_connected(max_min)
+
+    def predict_proba(self, X):
+        return self.forward(X).detach().numpy()
