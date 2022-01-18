@@ -3,6 +3,7 @@ and make a prediction.
 """
 
 import argparse
+import os
 from pathlib import Path
 
 import numpy as np
@@ -16,9 +17,9 @@ from sklearn.pipeline import make_pipeline
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--data_dir", required=True, type=Path,
+parser.add_argument("--data_dir", default='/home/nguigui/PycharmProjects/metastases/data', type=Path,
                     help="directory where data is stored")
-parser.add_argument("--num_runs", required=True, type=int,
+parser.add_argument("--num_runs", default=1, type=int,
                     help="Number of runs for the cross validation")
 parser.add_argument("--num_splits", default=5, type=int,
                     help="Number of splits for the cross validation")
@@ -42,6 +43,8 @@ def get_features(filenames):
 
         # Remove location features (but we could use them?)
         patient_features = patient_features[:, 3:]
+        if len(patient_features) < 1000:
+            patient_features = np.concatenate([patient_features, np.zeros((1000 - len(patient_features), 2048))])
 
         features.append(patient_features)
 
@@ -71,7 +74,8 @@ if __name__ == "__main__":
     train_output = pd.read_csv(train_output_filename)
 
     # Get the filenames for train
-    filenames_train = [train_dir / "{}.npy".format(idx) for idx in train_output["ID"]]
+    # filenames_train = [train_dir / f'ID_{idx:03}.npy' for idx in train_output["ID"]]
+    filenames_train = [train_dir / k for k in os.listdir(train_dir)]
     for filename in filenames_train:
         assert filename.is_file(), filename
 

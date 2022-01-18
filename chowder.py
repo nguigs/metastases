@@ -17,8 +17,7 @@ class CHOWDER(nn.Module):
 
     def forward(self, x):
         embedded = torch.matmul(x, self.feature_embedding)
-        embedded_sorted, _ = torch.sort(embedded)
-        min = embedded_sorted[..., :self.retain]
-        max = embedded_sorted[..., -self.retain:]
+        min, _ = torch.topk(embedded, self.retain, largest=False)
+        max, _ = torch.topk(embedded, self.retain)
         max_min = torch.cat([min, max], dim=-1)
         return self.fully_connected(max_min)
