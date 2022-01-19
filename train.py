@@ -1,9 +1,9 @@
 import numpy as np
 import pathlib
 import torch
+from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import roc_auc_score
-from torch import nn
-from chowder import CHOWDER, Dataset
+from chowder import Dataset, fit_model
 from submission_tools import get_train_set
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -14,36 +14,36 @@ data_dir = pathlib.Path('/user/nguigui/home/PycharmProjects/metastases/data')
 X_train, y_train = get_train_set(data_dir)
 X_train = torch.from_numpy(X_train.astype(np.float32).reshape((-1, 2048, 1000)))
 
-n_runs = 2
-learning_rate = 1e-3
-n_epochs = 30
-l2_regularization = .5
+n_folds = 3
+n_runs = 1
+hyperparams = {
+    'retain': 5,
+    'dropout_0': 0,
+    'dropout_1': .5,
+    'dropout_2': .3,
+    'learning_rate': 1e-3,
+    'n_epochs': 30,
+    'l2_regularization': .2
+}
 
-training_set = Dataset(X_train, y_train)
-generator = torch.utils.data.DataLoader(training_set, batch_size=10, shuffle=True)
+cv = StratifiedKFold(n_folds, shuffle=True)
 
-loss_function = nn.BCELoss(reduction='sum')
+train_preds = []
+test_preds = []
+for train_idx, test_idx in cv.split(X_train, y_train):
+    for _ in range(n_runs):
+        training_set = Dataset(X_train[train_idx], y_train[train_idx])
+        generator = torch.utils.data.DataLoader(training_set, batch_size=10, shuffle=True)
+        model = fit_model(generator, device, **hyperparams).cpu()
 
-preds = []
-for _ in range(n_runs):
-    model = CHOWDER(dropout_2=.23).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    for epoch in range(n_epochs):
-        for X_batch, y_batch in generator:
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device, dtype=torch.float)
-            
-            y_pred = model(X_batch)
-            
-            conv_params = torch.cat([x.view(-1) for x in model.feature_embedding.parameters()])
-            l2_conv = torch.sum(conv_params ** 2)
-            loss = loss_function(y_pred, y_batch) + l2_regularization * l2_conv
-            
-            model.zero_grad()
-            loss.backward()
-            optimizer.step()
+        y_pred_train = model.predict_proba(X_train[train_idx])
+        train_preds.append(y_pred_train)
 
-    y_pred = model.predict_proba(X_train.to(device))
-    preds.append(y_pred)
+        y_pred_test = model.predict_proba(X_train[test_idx])
+        test_preds.append(y_pred_test)
 
-mean_pred = np.stack(preds).mean(axis=0)
-print(roc_auc_score(y_train, mean_pred))
+    y_pred_mean_train = np.mean(train_preds, axis=0)
+    y_pred_mean_test = np.mean(test_preds, axis=0)
+
+    print('train:', roc_auc_score(y_train[train_idx], y_pred_mean_train))
+    print('test:', roc_auc_score(y_train[test_idx], y_pred_mean_test))

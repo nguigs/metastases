@@ -38,11 +38,15 @@ def get_train_set(data_dir):
 
     # Get the filenames for train
     filenames_train = [train_dir / k for k in os.listdir(train_dir)]
+    index = []
     for filename in filenames_train:
+        pid = filename.stem.split('_')[1]
+        index.append(int(pid))
         assert filename.is_file(), filename
+    index_sorted = np.argsort(index)
 
     # Get the features for training
-    features_train = get_features(filenames_train)
+    features_train = get_features(np.stack(filenames_train)[index_sorted])
 
     # Get the labels
     labels_train = train_output["Target"].values
@@ -55,18 +59,20 @@ def get_test_set(data_dir):
 
     # Get the filenames for train
     filenames_test = [test_dir / k for k in os.listdir(test_dir)]
+    index = []
     for filename in filenames_test:
+        pid = filename.stem.split('_')[1]
+        index.append(int(pid))
         assert filename.is_file(), filename
-    ids_test = [f.stem for f in filenames_test]
+    index_sorter = np.argsort(index)
 
     # Get the features for training
-    features_test = get_features(filenames_test)
-    return features_test, ids_test
+    features_test = get_features(np.array(filenames_test)[index_sorter])
+    return features_test, [f"ID_{k}" for k in np.array(index)[index_sorter]]
 
 
-def save_predictions(pred_dir, name, ids_test, estimator, features_test):
-    preds_test = estimator.predict_proba(features_test)[:, 0]
+def save_predictions(pred_dir, name, ids_test, predictions):
     ids_number_test = [i.split("ID_")[1] for i in ids_test]
-    test_output = pd.DataFrame({"ID": ids_number_test, "Target": preds_test})
+    test_output = pd.DataFrame({"ID": ids_number_test, "Target": predictions})
     test_output.set_index("ID", inplace=True)
     test_output.to_csv(pred_dir / f"preds_test_{name}.csv")
