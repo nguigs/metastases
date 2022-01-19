@@ -4,9 +4,12 @@ import torch
 from chowder import CHOWDER
 from submission_tools import get_train_set, get_test_set, save_predictions
 
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+print(f'Using {device} device')
+
 data_dir = pathlib.Path('/user/nguigui/home/PycharmProjects/metastases/data')
 pred_dir = pathlib.Path('/user/nguigui/home/PycharmProjects/metastases/predictions')
-model = CHOWDER()
+model = CHOWDER().to(device)
 
 X_train, y_train = get_train_set(data_dir)
 X_test, ids_test = get_test_set(data_dir)
