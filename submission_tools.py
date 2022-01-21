@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import pandas as pd
 
@@ -37,19 +36,19 @@ def get_train_set(data_dir):
     train_output = pd.read_csv(train_output_filename)
 
     # Get the filenames for train
-    filenames_train = [train_dir / k for k in os.listdir(train_dir)]
+    filenames_train = sorted(train_dir.glob("*.npy"))
     index = []
     for filename in filenames_train:
         pid = filename.stem.split('_')[1]
         index.append(int(pid))
         assert filename.is_file(), filename
-    index_sorted = np.argsort(index)
 
     # Get the features for training
-    features_train = get_features(np.stack(filenames_train)[index_sorted])
+    features_train = get_features(filenames_train)
 
     # Get the labels
     labels_train = train_output["Target"].values
+    assert all(train_output["ID"] == index)
     return features_train, labels_train
 
 
@@ -58,17 +57,16 @@ def get_test_set(data_dir):
     test_dir = data_dir / "test_input" / "resnet_features"
 
     # Get the filenames for train
-    filenames_test = [test_dir / k for k in os.listdir(test_dir)]
+    filenames_test = sorted(test_dir.glob("*.npy"))
     index = []
     for filename in filenames_test:
         pid = filename.stem.split('_')[1]
         index.append(int(pid))
         assert filename.is_file(), filename
-    index_sorter = np.argsort(index)
 
     # Get the features for training
-    features_test = get_features(np.array(filenames_test)[index_sorter])
-    return features_test, [f"ID_{k}" for k in np.array(index)[index_sorter]]
+    features_test = get_features(filenames_test)
+    return features_test, [f"ID_{k}" for k in index]
 
 
 def save_predictions(pred_dir, name, ids_test, predictions):

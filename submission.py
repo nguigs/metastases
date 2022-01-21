@@ -12,20 +12,25 @@ data_dir = pathlib.Path('/user/nguigui/home/PycharmProjects/metastases/data')
 pred_dir = pathlib.Path('/user/nguigui/home/PycharmProjects/metastases/predictions')
 
 X_train, y_train = get_train_set(data_dir)
-X_train = torch.from_numpy(X_train.astype(np.float32).reshape((-1, 2048, 1000)))
+X_train = torch.from_numpy(
+    X_train.astype(np.float32)#.reshape((-1, 2048, 1000))
+)
 
 X_test, ids_test = get_test_set(data_dir)
-X_test = torch.from_numpy(X_test.astype(np.float32).reshape((-1, 2048, 1000)))
+X_test = torch.from_numpy(
+    X_test.astype(np.float32)#.reshape((-1, 2048, 1000))
+)
 
 n_runs = 10
 hyperparams = {
     'retain': 5,
-    'dropout_0': .5,
+    'dropout_0': .1,
     'dropout_1': .5,
-    'dropout_2': .5,
+    'dropout_2': .3,
     'learning_rate': 1e-3,
     'n_epochs': 30,
-    'l2_regularization': .5
+    'l2_regularization': .5,
+    'linear': True
 }
 
 training_set = Dataset(X_train, y_train)

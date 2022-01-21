@@ -3,7 +3,6 @@ and make a prediction.
 """
 
 import argparse
-import os
 from pathlib import Path
 
 import numpy as np
@@ -12,14 +11,12 @@ import sklearn
 import sklearn.linear_model
 import sklearn.metrics
 import sklearn.model_selection
-from sklearn.preprocessing import FunctionTransformer
-from sklearn.pipeline import make_pipeline
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir", default='/home/nguigui/PycharmProjects/metastases/data', type=Path,
                     help="directory where data is stored")
-parser.add_argument("--num_runs", default=10, type=int,
+parser.add_argument("--num_runs", default=1, type=int,
                     help="Number of runs for the cross validation")
 parser.add_argument("--num_splits", default=5, type=int,
                     help="Number of splits for the cross validation")
@@ -67,7 +64,7 @@ if __name__ == "__main__":
 
     # Get the filenames for train
     # filenames_train = [train_dir / f'ID_{idx:03}.npy' for idx in train_output["ID"]]
-    filenames_train = [train_dir / k for k in os.listdir(train_dir)]
+    filenames_train = sorted(train_dir.glob("*.npy"))
     for filename in filenames_train:
         assert filename.is_file(), filename
 
