@@ -12,7 +12,7 @@ print(f'Using {device} device')
 
 data_dir = pathlib.Path('/user/nguigui/home/PycharmProjects/metastases/data')
 
-X_train, y_train = get_train_set(data_dir)
+X_train, y_train, n_tiles = get_train_set(data_dir)
 X_train = torch.from_numpy(
     X_train.astype(np.float32)#.reshape((-1, 2048, 1000))
 )
@@ -20,13 +20,13 @@ X_train = torch.from_numpy(
 n_folds = 5
 n_runs = 2
 hyperparams = {
-    'retain': 5,
-    'dropout_0': .2,
+    'retain': 10,
+    'dropout_0': .5,
     'dropout_1': .5,
-    'dropout_2': .3,
+    'dropout_2': .5,
     'learning_rate': 5e-4,
-    'n_epochs': 30,
-    'l2_regularization': .3,
+    'n_epochs': 80,
+    'l2_regularization': 3.,
     'linear': True,
     'amsgrad': True
 }
@@ -47,8 +47,9 @@ for train_idx, test_idx in cv.split(X_train, y_train):
     for i in range(n_runs):
 
         training_set = Dataset(X_train[train_idx], y_train[train_idx])
-        generator = torch.utils.data.DataLoader(training_set, batch_size=15, shuffle=True)
-        model = fit_model(generator, device, **hyperparams).cpu()
+        generator = torch.utils.data.DataLoader(training_set, batch_size=10, shuffle=True)
+        model, log_time = fit_model(generator, device, **hyperparams)
+        model = model.cpu()
 
         y_pred_train = model.predict_proba(X_train[train_idx])
         train_preds.append(y_pred_train)
@@ -56,10 +57,9 @@ for train_idx, test_idx in cv.split(X_train, y_train):
         y_pred_test = model.predict_proba(X_train[test_idx])
         test_preds.append(y_pred_test)
 
-        print(f'run {i} -----------------------------')
+        print(f'run {i} -- {log_time}-----------------------------')
         print('train:', roc_auc_score(y_train[train_idx], y_pred_train))
         score = roc_auc_score(y_train[test_idx], y_pred_test)
-        roc_test.append(score)
         print('test:', score)
         print('baseline test:', roc_auc_score(y_train[test_idx], baseline_pred))
 

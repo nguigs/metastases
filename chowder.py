@@ -22,7 +22,7 @@ class CHOWDER(nn.Module):
         if self.linear:
             embedded = self.feature_embedding(x).squeeze()
         else:
-            embedded = self.feature_embedding(x.reshape(-1, 2048, 1000))
+            embedded = self.feature_embedding(x.transpose(-1, -2))
         min_feature, _ = torch.topk(embedded, self.retain, largest=False)
         max_feature, _ = torch.topk(embedded, self.retain)
         max_min = torch.cat([min_feature, max_feature], dim=-1)
@@ -60,8 +60,10 @@ def fit_model(
     loss_function = nn.BCELoss(reduction='sum')
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, amsgrad=amsgrad)
 
-    tb = SummaryWriter(f'./runs/{time.time()}')
+    log_wall_time = time.time()
+    tb = SummaryWriter(f'./runs/{log_wall_time}')
 
+    iteration = 0
     for epoch in range(n_epochs):
         epoch_loss = 0
         for x_batch, y_batch in generator:
@@ -77,7 +79,12 @@ def fit_model(
             model.zero_grad()
             loss.backward()
             optimizer.step()
+            iteration += 1
+
+            grad = torch.cat([x.view(-1) for x in model.parameters()])
+            grad_norm = torch.norm(grad)
+            tb.add_scalar("Grad Norm", grad_norm, iteration)
 
         tb.add_scalar("Loss", epoch_loss, epoch)
     tb.close()
-    return model
+    return model, log_wall_time

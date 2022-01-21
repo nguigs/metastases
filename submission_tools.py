@@ -13,19 +13,21 @@ def get_features(filenames):
     """
     # Load numpy arrays
     features = []
+    n_tiles_index = []
     for f in filenames:
         patient_features = np.load(f)
 
         # Remove location features (but we could use them?)
         patient_features = patient_features[:, 3:]
         n_tiles = len(patient_features)
+        n_tiles_index.append(n_tiles)
         if n_tiles < 1000:
             patient_features = np.concatenate([patient_features, np.zeros((1000 - n_tiles, 2048))])
 
         features.append(patient_features)
 
     features = np.stack(features, axis=0)
-    return features
+    return features, n_tiles_index
 
 
 def get_train_set(data_dir):
@@ -44,12 +46,12 @@ def get_train_set(data_dir):
         assert filename.is_file(), filename
 
     # Get the features for training
-    features_train = get_features(filenames_train)
+    features_train, n_tiles = get_features(filenames_train)
 
     # Get the labels
     labels_train = train_output["Target"].values
     assert all(train_output["ID"] == index)
-    return features_train, labels_train
+    return features_train, labels_train, n_tiles
 
 
 def get_test_set(data_dir):
@@ -65,8 +67,8 @@ def get_test_set(data_dir):
         assert filename.is_file(), filename
 
     # Get the features for training
-    features_test = get_features(filenames_test)
-    return features_test, [f"ID_{k}" for k in index]
+    features_test, n_tiles = get_features(filenames_test)
+    return features_test, [f"ID_{k}" for k in index], n_tiles
 
 
 def save_predictions(pred_dir, name, ids_test, predictions):
