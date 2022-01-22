@@ -1,5 +1,6 @@
 import time
 import torch
+from sklearn.metrics import roc_auc_score
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
@@ -16,7 +17,7 @@ class CHOWDER(nn.Module):
         self.fully_connected = nn.Sequential(
             nn.Dropout(p=dropout_0), nn.Linear(2 * retain, 200), nn.Sigmoid(),
             nn.Dropout(p=dropout_1), nn.Linear(200, 100), nn.Sigmoid(),
-            nn.Dropout(p=dropout_2), nn.Linear(100, 1), nn.Sigmoid())
+            nn.Dropout(p=dropout_2), nn.Linear(100, 1))
 
     def forward(self, x):
         if self.linear:
@@ -46,18 +47,27 @@ class Dataset(torch.utils.data.Dataset):
 
 
 def fit_model(
-        generator, device, retain=2,  dropout_0=.5, dropout_1=.5, dropout_2=.275,
-        learning_rate=1e-3, n_epochs=30, l2_regularization=.5, linear=True, amsgrad=False):
+        generator, device, validation=None, retain=2,  dropout_0=.5, dropout_1=.5, dropout_2=.275,
+        learning_rate=1e-3, n_epochs=30, l2_regularization=.5, linear=True, amsgrad=False, warm_start=None):
     """Run gradient descent on data given in the generator."""
-    model = CHOWDER(
-        retain=retain,
-        dropout_0=dropout_0,
-        dropout_1=dropout_1,
-        dropout_2=dropout_2,
-        linear=linear
-    ).to(device)
+    if warm_start is None:
+        model = CHOWDER(
+            retain=retain,
+            dropout_0=dropout_0,
+            dropout_1=dropout_1,
+            dropout_2=dropout_2,
+            linear=linear
+        ).to(device)
+        loss_function = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=torch.FloatTensor([5.]).to(device))
+    else:
+        model = warm_start.to(device)
+        loss_function = nn.BCEWithLogitsLoss(reduction='sum')
 
-    loss_function = nn.BCELoss(reduction='sum')
+    validate = False
+    if validation is not None:
+        validate = True
+        x_test, y_test = validation
+
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, amsgrad=amsgrad)
 
     log_wall_time = time.time()
@@ -86,5 +96,11 @@ def fit_model(
             tb.add_scalar("Grad Norm", grad_norm, iteration)
 
         tb.add_scalar("Loss", epoch_loss, epoch)
+
+        if validate:
+            y_validation = model(x_test.to(device))
+            score = roc_auc_score(y_test, y_validation.detach().cpu().numpy())
+            tb.add_scalar("Validation AUC", score, epoch)
+
     tb.close()
     return model, log_wall_time

@@ -20,13 +20,13 @@ X_train = torch.from_numpy(
 n_folds = 5
 n_runs = 2
 hyperparams = {
-    'retain': 10,
-    'dropout_0': .5,
+    'retain': 5,
+    'dropout_0': .2,
     'dropout_1': .5,
-    'dropout_2': .5,
-    'learning_rate': 5e-4,
-    'n_epochs': 80,
-    'l2_regularization': 3.,
+    'dropout_2': .3,
+    'learning_rate': 1e-3,
+    'n_epochs': 30,
+    'l2_regularization': .5,
     'linear': True,
     'amsgrad': True
 }
@@ -43,21 +43,25 @@ for train_idx, test_idx in cv.split(X_train, y_train):
     estimator = LogisticRegression(penalty="l2", C=1.0, solver="liblinear")
     estimator.fit(X_train[train_idx].mean(1), y_train[train_idx])
     baseline_pred = estimator.predict_proba(X_train[test_idx].mean(1))[:, 1]
-
+    validation = (X_train[test_idx], y_train[test_idx])
+    model = None
     for i in range(n_runs):
+        warm_start = model if i % 2 == 1 else None
 
         training_set = Dataset(X_train[train_idx], y_train[train_idx])
         generator = torch.utils.data.DataLoader(training_set, batch_size=10, shuffle=True)
-        model, log_time = fit_model(generator, device, **hyperparams)
-        model = model.cpu()
 
+        model, log_time = fit_model(
+            generator, device, validation, warm_start=warm_start, **hyperparams)
+
+        model = model.cpu()
         y_pred_train = model.predict_proba(X_train[train_idx])
         train_preds.append(y_pred_train)
 
         y_pred_test = model.predict_proba(X_train[test_idx])
         test_preds.append(y_pred_test)
 
-        print(f'run {i} -- {log_time}-----------------------------')
+        print(f'run {i} -- {loss} -- {warm_start is None} -- {log_time}-----------------------------')
         print('train:', roc_auc_score(y_train[train_idx], y_pred_train))
         score = roc_auc_score(y_train[test_idx], y_pred_test)
         print('test:', score)
