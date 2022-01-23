@@ -6,7 +6,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 class CHOWDER(nn.Module):
-    def __init__(self, retain=2, dropout_0=.5, dropout_1=.5, dropout_2=.275, linear=True):
+    def __init__(self, retain=2, dropout_0=.5, dropout_1=.5, dropout_2=.275, linear=True, relu=False):
         super(CHOWDER, self).__init__()
         if linear:
             self.feature_embedding = nn.Linear(2048, 1, bias=False)
@@ -14,10 +14,16 @@ class CHOWDER(nn.Module):
             self.feature_embedding = nn.Conv1d(2048, 1, kernel_size=(3, ), padding='same')
         self.linear = linear
         self.retain = retain
-        self.fully_connected = nn.Sequential(
-            nn.Dropout(p=dropout_0), nn.Linear(2 * retain, 200), nn.Sigmoid(),
-            nn.Dropout(p=dropout_1), nn.Linear(200, 100), nn.Sigmoid(),
-            nn.Dropout(p=dropout_2), nn.Linear(100, 1))
+        if relu:
+            self.fully_connected = nn.Sequential(
+                nn.Dropout(p=dropout_0), nn.Linear(2 * retain, 200), nn.ReLU(),
+                nn.Dropout(p=dropout_1), nn.Linear(200, 100), nn.ReLU(),
+                nn.Dropout(p=dropout_2), nn.Linear(100, 1))
+        else:
+            self.fully_connected = nn.Sequential(
+                nn.Dropout(p=dropout_0), nn.Linear(2 * retain, 200), nn.Sigmoid(),
+                nn.Dropout(p=dropout_1), nn.Linear(200, 100), nn.Sigmoid(),
+                nn.Dropout(p=dropout_2), nn.Linear(100, 1))
 
     def forward(self, x):
         if self.linear:
@@ -58,10 +64,12 @@ def fit_model(
             dropout_2=dropout_2,
             linear=linear
         ).to(device)
-        loss_function = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=torch.FloatTensor([5.]).to(device))
+        loss_function = nn.BCEWithLogitsLoss(reduction='sum', pos_weight=torch.FloatTensor([3.]).to(device))
     else:
         model = warm_start.to(device)
         loss_function = nn.BCEWithLogitsLoss(reduction='sum')
+        learning_rate /= 5
+        n_epochs //= 2
 
     validate = False
     if validation is not None:

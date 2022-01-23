@@ -28,15 +28,15 @@ X_test = torch.from_numpy(
 log_key = round(time())
 logging.basicConfig(filename=pred_dir / f'log_{log_key}.log', level=logging.INFO)
 
-n_runs = 40
+n_runs = 20
 hyperparams = {
     'retain': 5,
-    'dropout_0': .2,
+    'dropout_0': .5,
     'dropout_1': .5,
-    'dropout_2': .3,
+    'dropout_2': .5,
     'learning_rate': 1e-3,
     'n_epochs': 60,
-    'l2_regularization': .5,
+    'l2_regularization': 5.,
     'linear': True,
     'amsgrad': True
 }

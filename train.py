@@ -3,7 +3,7 @@ import pathlib
 import torch
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, recall_score
 from chowder import Dataset, fit_model
 from submission_tools import get_train_set
 
@@ -21,17 +21,17 @@ n_folds = 5
 n_runs = 2
 hyperparams = {
     'retain': 5,
-    'dropout_0': .2,
+    'dropout_0': .5,
     'dropout_1': .5,
-    'dropout_2': .3,
+    'dropout_2': .5,
     'learning_rate': 1e-3,
-    'n_epochs': 30,
-    'l2_regularization': .5,
+    'n_epochs': 60,
+    'l2_regularization': 5.,
     'linear': True,
     'amsgrad': True
 }
 
-cv = StratifiedKFold(n_folds, shuffle=True, random_state=1)
+cv = StratifiedKFold(n_folds, shuffle=True, random_state=2)
 
 roc_test = []
 j = 0
@@ -47,7 +47,7 @@ for train_idx, test_idx in cv.split(X_train, y_train):
     model = None
     for i in range(n_runs):
         warm_start = model if i % 2 == 1 else None
-
+        # warm_start = None
         training_set = Dataset(X_train[train_idx], y_train[train_idx])
         generator = torch.utils.data.DataLoader(training_set, batch_size=10, shuffle=True)
 
@@ -61,11 +61,11 @@ for train_idx, test_idx in cv.split(X_train, y_train):
         y_pred_test = model.predict_proba(X_train[test_idx])
         test_preds.append(y_pred_test)
 
-        print(f'run {i} -- {loss} -- {warm_start is None} -- {log_time}-----------------------------')
+        print(f'run {i} ---- {warm_start is not None} -- {log_time}-----------------------------')
         print('train:', roc_auc_score(y_train[train_idx], y_pred_train))
         score = roc_auc_score(y_train[test_idx], y_pred_test)
         print('test:', score)
-        print('baseline test:', roc_auc_score(y_train[test_idx], baseline_pred))
+        print('recall', recall_score(y_train[test_idx], y_pred_test >= .5))
 
     # append baseline pred for very bad cases
     test_preds.append(baseline_pred)
@@ -78,6 +78,7 @@ for train_idx, test_idx in cv.split(X_train, y_train):
     score = roc_auc_score(y_train[test_idx], y_pred_mean_test)
     roc_test.append(score)
     print('test:', score)
+    print('baseline test:', roc_auc_score(y_train[test_idx], baseline_pred))
     j += 1
 
 aucs = np.array(roc_test)
